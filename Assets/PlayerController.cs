@@ -1,7 +1,10 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Numerics;
 using UnityEngine;
+using Quaternion = UnityEngine.Quaternion;
+using Vector2 = UnityEngine.Vector2;
 
 public class PlayerController : MonoBehaviour
 {
@@ -12,13 +15,24 @@ public class PlayerController : MonoBehaviour
     public float rotationLimit = 10f;
     public float cameraStiffness = 1f;
     public float cameraRange = 75f;
+    public ParticleEmitter particleEmitter;
 
+    public GameObject projectile;
+
+    public List<Transform> weaponLocations;
+    
     private Rigidbody2D _rigidbody;
+    private Vector2 _currentOffset;
+
+    public float weaponRate = .1f;
+
+    private float _weaponTimer = 0f;
     
     // Start is called before the first frame update
     void Start()
     {
         _rigidbody = GetComponent<Rigidbody2D>();
+        _currentOffset = new Vector2(0f, 0f);
     }
 
     // Update is called once per frame
@@ -42,17 +56,28 @@ public class PlayerController : MonoBehaviour
         
         if (_rigidbody.angularVelocity > rotationLimit) _rigidbody.angularVelocity = rotationLimit;
         if (_rigidbody.angularVelocity < -rotationLimit) _rigidbody.angularVelocity = -rotationLimit;
-
-        //Debug.Log(_rigidbody.angularVelocity);
         
+        // Weapons
+
+        if (Input.GetButton("Fire1") && _weaponTimer >= (1/weaponRate))
+        {
+            foreach (Transform weaponLocation in weaponLocations)
+            {
+                GameObject spawnedProjectile = Instantiate(projectile, weaponLocation.position, Quaternion.identity);
+                spawnedProjectile.GetComponent<Rigidbody2D>().velocity = _rigidbody.velocity + new Vector2(Mathf.Sin(_rigidbody.rotation * (Mathf.PI / 180)), -Mathf.Cos(_rigidbody.rotation * (Mathf.PI / 180))) * -4f;
+            }
+            _weaponTimer = 0f;
+        }
+        
+
         // Camera
-        // Vector3 newPosition = _rigidbody.position + (_rigidbody.velocity.normalized * cameraRange);
-        // Vector3 oldPosition = cameraTransform.position;
-        // oldPosition = new Vector2(
-        //         Mathf.Lerp(oldPosition.x, newPosition.x, cameraStiffness),
-        //         Mathf.Lerp(oldPosition.y, newPosition.y, cameraStiffness)
-        //     );
-        // cameraTransform.position = oldPosition;
-        cameraTransform.position = _rigidbody.position;
+        var velocity = _rigidbody.velocity;
+        Vector2 offsetPosition = -velocity.normalized * ((velocity.magnitude / speedLimit) * cameraRange);
+        _currentOffset = Vector2.Lerp(_currentOffset, offsetPosition, cameraStiffness * Time.deltaTime);
+        cameraTransform.position = _rigidbody.position + _currentOffset;
+
+        particleEmitter.spawnRate = 1f + (Mathf.Abs(Input.GetAxis("Throttle")) * 19f);
+
+        _weaponTimer += Time.deltaTime;
     }
 }
